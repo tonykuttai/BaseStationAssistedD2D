@@ -1,0 +1,7 @@
+#Sun Apr 09 14:51:35 IST 2017
+base.0=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/transforms/dex/debug/folders/1000/10000/instant-run-bootstrap_6ea18e60b8b91d14a43c963ac396285575adc62b
+renamed.1=classes.dex
+renamed.0=classes2.dex
+file.1=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/transforms/dex/debug/folders/1000/10000/instant-run_cb02918b42025bc6ce6aeb1b7d0490d81c1d7372/classes.dex
+base.1=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/transforms/dex/debug/folders/1000/10000/instant-run_cb02918b42025bc6ce6aeb1b7d0490d81c1d7372
+file.0=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/transforms/dex/debug/folders/1000/10000/instant-run-bootstrap_6ea18e60b8b91d14a43c963ac396285575adc62b/classes.dex

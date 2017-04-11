@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/merged/debug/layout/device_list.xml",
+        "source": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/layout/device_list.xml"
+    },
+    {
+        "merged": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/merged/debug/layout/main.xml",
+        "source": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/layout/main.xml"
+    },
+    {
+        "merged": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/merged/debug/layout/device_detail.xml",
+        "source": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/layout/device_detail.xml"
+    },
+    {
+        "merged": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/merged/debug/layout/row_devices.xml",
+        "source": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/layout/row_devices.xml"
+    }
+]
