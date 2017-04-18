@@ -29,6 +29,7 @@ import android.net.wifi.p2p.WifiP2pManager.ConnectionInfoListener;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -38,8 +39,13 @@ import android.widget.Toast;
 
 import com.example.android.wifidirect.DeviceListFragment.DeviceActionListener;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,6 +58,8 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A fragment that manages a particular peer and allows interaction with device
@@ -70,7 +78,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
     public String[] clientAddresses = new String[3];
     public String[] sampleData = new String[3];
     public String[] receiveData = new String[3];
-
+    public static int devices = 2;
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
@@ -178,6 +186,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         if (info.groupFormed && info.isGroupOwner) {
             // here wait for the group members to connect and get their corresponding IP addresses
             clientAddresses[0] = info.groupOwnerAddress.getHostAddress();
+
             new GetClientIPAddressAtServer(getActivity(), mContentView.findViewById(R.id.group_client),mContentView.findViewById(R.id.resultData))
                     .execute();
 
@@ -231,77 +240,6 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         this.getView().setVisibility(View.GONE);
     }
 
-    /**
-     * A simple server socket that accepts connection and writes some data on
-     * the stream.
-     */
-    public static class FileServerAsyncTask extends AsyncTask<Void, Void, String> {
-
-        private Context context;
-        private TextView statusText;
-
-        /**
-         * @param context
-         * @param statusText
-         */
-        public FileServerAsyncTask(Context context, View statusText) {
-            this.context = context;
-            this.statusText = (TextView) statusText;
-        }
-
-        @Override
-        protected String doInBackground(Void... params) {
-            try {
-                ServerSocket serverSocket = new ServerSocket(mPortData);
-                Log.d(WiFiDirectActivity.TAG, "Server: Socket opened");
-                Socket client = serverSocket.accept();
-                Log.d(WiFiDirectActivity.TAG, "Server: connection done");
-                final File f = new File(Environment.getExternalStorageDirectory() + "/"
-                        + context.getPackageName() + "/wifip2pshared-" + System.currentTimeMillis()
-                        + ".jpg");
-
-                File dirs = new File(f.getParent());
-                if (!dirs.exists())
-                    dirs.mkdirs();
-                f.createNewFile();
-
-                Log.d(WiFiDirectActivity.TAG, "server: copying files " + f.toString());
-                InputStream inputstream = client.getInputStream();
-                copyFile(inputstream, new FileOutputStream(f));
-                serverSocket.close();
-                return f.getAbsolutePath();
-            } catch (IOException e) {
-                Log.e(WiFiDirectActivity.TAG, e.getMessage());
-                return null;
-            }
-        }
-
-        /*
-         * (non-Javadoc)
-         * @see android.os.AsyncTask#onPostExecute(java.lang.Object)
-         */
-        @Override
-        protected void onPostExecute(String result) {
-            if (result != null) {
-                statusText.setText("File copied - " + result);
-                Intent intent = new Intent();
-                intent.setAction(android.content.Intent.ACTION_VIEW);
-                intent.setDataAndType(Uri.parse("file://" + result), "image/*");
-                context.startActivity(intent);
-            }
-
-        }
-
-        /*
-         * (non-Javadoc)
-         * @see android.os.AsyncTask#onPreExecute()
-         */
-        @Override
-        protected void onPreExecute() {
-            statusText.setText("Opening a server socket");
-        }
-
-    }
 
     /*
 
@@ -313,8 +251,9 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         private Context context;
         private TextView resultText;
         private TextView clients;
-        private int noOfClients = 2;
+        private int noOfClients = devices - 1;
         private int index = 0;
+        private List<File> listOfFilesServer = new ArrayList<File>();
 
 
         public GetClientIPAddressAtServer(Context context,View clients,View resultData) {
@@ -327,7 +266,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         protected String[] doInBackground(Void... params) {
             String clientIP = "0.0.0.0";
             String inputLine;
-            receiveData[index] = sampleData[index];
+
             try {
                 ServerSocket serverSocket = new ServerSocket(mPortControl);
                 serverSocket.setReuseAddress(true);
@@ -364,7 +303,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             }
 
             //Broadcasting IP Addresses to the Clients
-            noOfClients = 2;
+            noOfClients = devices - 1;
             String IP = null;
 
             while(noOfClients > 0){
@@ -392,80 +331,150 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 
             }
 
-           // Receive the string parts from clients
-
-            noOfClients = 2;
+           // Receive the file parts from clients
+            noOfClients = devices - 1;
             while(noOfClients > 0){
                 try{
                     Socket serverSocket = new Socket();
                     serverSocket.connect(new InetSocketAddress(clientAddresses[noOfClients],mPortData),SOCKET_TIMEOUT);
-                    ObjectInputStream objectInputStream = new ObjectInputStream(serverSocket.getInputStream());
-                    ObjectOutputStream objectOutputStream = new ObjectOutputStream(serverSocket.getOutputStream());
 
-                    objectOutputStream.writeObject("SENDDATA");
-                    index = (int)objectInputStream.readObject();
-                    String data = (String) objectInputStream.readObject();
+                    InputStream inputstream = serverSocket.getInputStream();
+                    DataInputStream dataIn = new DataInputStream(inputstream);
+                    OutputStream outputStream = serverSocket.getOutputStream();
+                    DataOutputStream dataOut = new DataOutputStream(outputStream);
+
+                    dataOut.writeUTF("SENDDATA");
+                    dataOut.flush();
+
+                    index = (int)dataIn.readInt();
+                    long size = dataIn.readLong();
+                    String fileName = "D2DFile.receivedPart"+index;
+
+                    File rFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Server/"+ fileName);
+                    File dirs = new File(rFile.getParent());
+                    if (!dirs.exists())
+                        dirs.mkdirs();
+                    rFile.createNewFile();
+                    Log.d(WiFiDirectActivity.TAG, "server: copying files " + rFile.toString());
+
+                    copyFile(dataIn, new FileOutputStream(rFile),size);
+
                     noOfClients--;
-                    receiveData[index] = data;
-                    objectOutputStream.flush();
-                    objectInputStream.close();
-                    objectOutputStream.close();
+
+                    outputStream.close();
+                    dataOut.close();
+                    inputstream.close();
+                    dataIn.close();
                     serverSocket.close();
 
                 }catch (IOException e) {
                     e.printStackTrace();
-                } catch (ClassNotFoundException e) {
-                    e.printStackTrace();
                 }
             }
 
 
-            //Send Data to all the clients
+            //Copy server file part from FILE folder to SERVER Folder
+            String sfileName = "D2DFile.part0";
+            String destfileName = "D2DFile.receivedPart0";
+            File serverFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Files/" + sfileName );
+            File destFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Server/"+ destfileName);
+            try {
+                copyFiletoAnotherFolder(serverFile,destFile);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
-            for(int client = 1;client < 3;client++){
+            //Send all files to all the clients
+            for(int client = 1;client < devices;client++){
                 Socket sendData = new Socket();
                 try {
+
                     sendData.connect(new InetSocketAddress(clientAddresses[client],mPortData),SOCKET_TIMEOUT);
-                    ObjectInputStream objectInputStream = new ObjectInputStream(sendData.getInputStream());
-                    ObjectOutputStream objectOutputStream = new ObjectOutputStream(sendData.getOutputStream());
-                    objectOutputStream.writeObject("SENDING");
-                    if(objectInputStream.readObject().equals("YES")){
-                        for(int device = 0;device < 3;device++){
-                            if(client != device){
-                                objectOutputStream.writeObject(device);
-                                objectOutputStream.writeObject(receiveData[device]);
+
+                    InputStream inputstream = sendData.getInputStream();
+                    DataInputStream dataIn = new DataInputStream(inputstream);
+                    OutputStream outputStream = sendData.getOutputStream();
+                    DataOutputStream dataOut = new DataOutputStream(outputStream);
+
+                    dataOut.writeUTF("SENDING");
+                    dataOut.flush();
+                    if(dataIn.readUTF().equals("YES")){
+                        dataOut.writeInt(devices - 1); // No of parts
+                        dataOut.flush();
+                        for(int part = 0;part < devices;part++){
+                            if(client != part){
+
+                                //send the file part
+                                String fileName = "D2DFile.part"+part;
+                                File sFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Server/"+ fileName);
+                                long size = sFile.length();
+                                byte[] byteArray = new byte[(int) size];
+
+                                FileInputStream fis = new FileInputStream(sFile);
+                                BufferedInputStream bis = new BufferedInputStream(fis);
+                                DataInputStream dis = new DataInputStream(bis);
+                                dis.readFully(byteArray,0,byteArray.length);
+
+                                if((inputLine = dataIn.readUTF()).equals("SENDDATA")){
+                                    dataOut.writeInt(part);
+                                    dataOut.writeLong(size);
+                                    dataOut.flush();
+                                    dataOut.write(byteArray,0,byteArray.length);
+                                    dataOut.flush();
+                                }
+
                             }
                         }
                     }
 
-                    objectOutputStream.flush();
-                    objectOutputStream.close();
-                    objectInputStream.close();
+                    outputStream.flush();
+                    outputStream.close();
+                    dataOut.close();
+                    inputstream.close();
+                    dataIn.close();
                     sendData.close();
 
                 } catch (IOException e) {
                     e.printStackTrace();
-                } catch (ClassNotFoundException e) {
-                    e.printStackTrace();
                 }
+
 
             }
 
-            return receiveData;
+
+
+            // Return string array of files shared
+            File serverFolder = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Server");
+            File[] listOfFiles = serverFolder.listFiles();
+            int filenameIndex = 0;
+            for(File i : listOfFiles){
+                receiveData[filenameIndex++] = i.getName();
+            }
+
+            // Join all the file parts into single file
+
+
+            //return receiveData;
+            return clientAddresses;
         }
 
         @Override
         protected void onPostExecute(String[] s) {
-            clients.setText("Clients Connected IP \n" + clientAddresses[0] +"\n"+clientAddresses[1]+"\n"+clientAddresses[2]);
-            resultText.setText("Result Data : "+s[0]+" "+s[1]+" "+s[2]);
+            String textString = "";
+            String resultString = "";
+            for(int j = 0; j < devices;j++){
+                textString = textString + clientAddresses[j] + " \n ";
+                //resultString = resultString + s[j] + "\n";
+            }
+            clients.setText("Clients Connected IP \n" + textString);
+            //resultText.setText("Files Shared \n " + resultString);
         }
     }
 
     private class GetClientIPAddressAtClient extends AsyncTask<String,Void,String[]>{
         private Context context;
         private TextView statusText;
-        //private TextView resultText;
-        //String[] allClientIP;
+        String[] allClientIP = new String[devices];
         private int index = 0;
 
         /**
@@ -475,7 +484,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         public GetClientIPAddressAtClient(Context context, View statusText) {
             this.context = context;
             this.statusText = (TextView) statusText;
-            //this.resultText = (TextView) resultText;
+
         }
 
         @Override
@@ -511,7 +520,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             //Getting the IP Addresses of all the clients from the server
             ServerSocket socket = null;
             int index = 0;
-            String[] allClientIP = new String[3];
+
             try {
                 socket = new ServerSocket(mPortData);
                 socket.setReuseAddress(true);
@@ -523,7 +532,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 }
                 String[] receiveClientIP = (String[]) objectInputStream.readObject();
                 Log.e(WiFiDirectActivity.TAG, "Received the String Object ");
-                for (int q = 0; q < 3; q++) {
+                for (int q = 0; q < devices; q++) {
                     Log.d(WiFiDirectActivity.TAG, receiveClientIP[q]);
                     allClientIP[q] = receiveClientIP[q];
                 }
@@ -540,66 +549,117 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             }
 
 
-            // Send the String Part to the Server
+            //Identify the index
             int i = 0;
-            for (i = 1; i < 3; i++) {
+            for (i = 1; i < devices; i++) {
                 if (clientIP.equals((String) allClientIP[i])) {
-                    receiveData[i] = sampleData[i];
                     index = i;
                     break;
                 }
             }
 
-            Log.e(WiFiDirectActivity.TAG,"Sending the part : index "+ index + " : String : " + receiveData[index]);
-
+            // Sending the file part to server
             try {
                 ServerSocket dataSocket = new ServerSocket(mPortData);
                 dataSocket.setReuseAddress(true);
                 Socket server = dataSocket.accept();
-                ObjectOutputStream objectOutputStream = new ObjectOutputStream(server.getOutputStream());
-                ObjectInputStream objectInputStream = new ObjectInputStream(server.getInputStream());
 
-                if(objectInputStream.readObject().equals("SENDDATA")){
-                    objectOutputStream.writeObject(index);
-                    objectOutputStream.writeObject(receiveData[index]);
+                InputStream in = server.getInputStream();
+                DataInputStream serverData = new DataInputStream(in);
+                OutputStream out = server.getOutputStream();
+                DataOutputStream clientData = new DataOutputStream(out);
+
+                String fileName = "D2DFile.part"+index;
+                File sFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Files/" + fileName);
+                long size = sFile.length();
+                byte[] byteArray = new byte[(int) size];
+
+                FileInputStream fis = new FileInputStream(sFile);
+                BufferedInputStream bis = new BufferedInputStream(fis);
+                DataInputStream dis = new DataInputStream(bis);
+                dis.readFully(byteArray,0,byteArray.length);
+
+                if((inputLine = serverData.readUTF()).equals("SENDDATA")){
+                    clientData.writeInt(index);
+                    clientData.writeLong(size);
+                    clientData.flush();
+                    clientData.write(byteArray,0,byteArray.length);
+                    clientData.flush();
                 }
-                objectOutputStream.flush();
-                objectOutputStream.close();
-                objectInputStream.close();
+
+                out.close();
+                clientData.close();
+                in.close();
+                serverData.close();
+                dis.close();
                 dataSocket.close();
+                server.close();
             } catch (IOException e) {
-                e.printStackTrace();
-            } catch (ClassNotFoundException e) {
                 e.printStackTrace();
             }
 
 
+            // Get all the file parts from server
             int rIndex = 0;
+            int noOfParts = 0;
             try {
                 ServerSocket receiveParts = new ServerSocket(mPortData);
                 receiveParts.setReuseAddress(true);
                 Socket getData = receiveParts.accept();
-                ObjectOutputStream objectOutputStream = new ObjectOutputStream(getData.getOutputStream());
-                ObjectInputStream objectInputStream = new ObjectInputStream(getData.getInputStream());
 
-                if(objectInputStream.readObject().equals("SENDING")){
-                    objectOutputStream.writeObject("YES");
-                    for(int parts = 0;parts < 2;parts++){
-                        rIndex = (int)objectInputStream.readObject();
-                        String data = (String) objectInputStream.readObject();
-                        receiveData[rIndex] = data;
+                InputStream inputstream = getData.getInputStream();
+                DataInputStream dataIn = new DataInputStream(inputstream);
+                OutputStream outputStream = getData.getOutputStream();
+                DataOutputStream dataOut = new DataOutputStream(outputStream);
+
+                if(dataIn.readUTF().equals("SENDING")){
+                    dataOut.writeUTF("YES");
+                    dataOut.flush();
+                    noOfParts = dataIn.readInt(); //get no of parts
+
+                    for(int parts = 0;parts < noOfParts;parts++){
+                        dataOut.writeUTF("SENDDATA");
+                        dataOut.flush();
+                        rIndex =  dataIn.readInt(); //get the file part
+                        long size = dataIn.readLong(); //get the file size
+                        String fileName = "D2DFile.receivedPart"+rIndex;
+
+                        File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Client/"+fileName);
+                        File dirs = new File(receivedFile.getParent());
+                        if(!dirs.exists()){
+                            dirs.mkdirs();
+                        }
+                        receivedFile.createNewFile();
+
+                        copyFile(dataIn,new FileOutputStream(receivedFile),size);
+
                     }
+
                 }
-                objectOutputStream.flush();
-                objectInputStream.close();
-                objectOutputStream.close();
+
+                outputStream.flush();
+                outputStream.close();
+                dataOut.flush();
+                dataOut.close();
+                dataIn.close();
+                inputstream.close();
+                getData.close();
                 receiveParts.close();
             } catch (IOException e) {
                 e.printStackTrace();
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
             }
 
+
+
+            // Return string array of files shared
+            File clientFolder = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Server");
+            File[] listOfFiles = clientFolder.listFiles();
+            int filenameIndex = 0;
+            for(File q : listOfFiles){
+                receiveData[filenameIndex++] = q.getName();
+            }
+
+            //join all the file parts
 
 
 
@@ -609,24 +669,32 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         @Override
         protected void onPostExecute(String[] s) {
 
-            if (s != null) {
-                statusText.setText("Client IP Addresses " + s[0] +"\n" +s[1] +"\n" +s[2]);
-            }
+            String textString = "";
+            String resultString = "";
 
-            TextView resultText = (TextView)mContentView.findViewById(R.id.resultData);
-            resultText.setText("Result Data "+ receiveData[0] + " " + receiveData[1] +" " + receiveData[2]);
+                for(int j = 0;j < devices;j++){
+                    textString = textString + s[j] + "\n";
+                    //resultString = resultString + receiveData[j] + "\n";
+                }
+
+                statusText.setText("Client IP Addresses : \n" + textString);
+
+                /*TextView resultText = (TextView)mContentView.findViewById(R.id.resultData);
+                resultText.setText("Files Shared \n "+ resultString);*/
+
 
 
         }
     }
 
-    public static boolean copyFile(InputStream inputStream, OutputStream out) {
+    public static boolean copyFile(DataInputStream inputStream, OutputStream out,long size) {
         byte buf[] = new byte[1024];
-        int len;
+        int bytesRead;
+        int current = 0;
         try {
-            while ((len = inputStream.read(buf)) != -1) {
-                out.write(buf, 0, len);
-
+            while ((size > 0) && (bytesRead = inputStream.read(buf,0,(int)Math.min(buf.length,size))) != -1) {
+                out.write(buf, 0, bytesRead);
+                size -= bytesRead;
             }
             out.close();
             inputStream.close();
@@ -636,6 +704,32 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         }
         return true;
     }
+
+    public static boolean copyFiletoAnotherFolder(File source,File dest)throws  IOException{
+        InputStream is = null;
+        OutputStream os = null;
+        try {
+            is = new FileInputStream(source);
+            os = new FileOutputStream(dest);
+
+            byte[] buffer = new byte[1024];
+            int length = 0;
+            while((length = is.read(buffer)) > 0){
+                os.write(buffer,0,length);
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+            is.close();
+            os.close();
+        }
+
+        return true;
+
+    }
+
 
     public class MultiServerThread implements Runnable {
 

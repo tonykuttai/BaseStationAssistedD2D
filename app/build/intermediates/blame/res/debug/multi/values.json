@@ -11,7 +11,14 @@
                     "endOffset": 106
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/colors.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/colors.xml",
+                    "position": {
+                        "startLine": 3,
+                        "startColumn": 4,
+                        "startOffset": 108,
+                        "endColumn": 55,
+                        "endOffset": 159
+                    }
                 }
             },
             {
@@ -23,7 +30,14 @@
                     "endOffset": 159
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/colors.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/colors.xml",
+                    "position": {
+                        "startLine": 2,
+                        "startColumn": 4,
+                        "startOffset": 55,
+                        "endColumn": 52,
+                        "endOffset": 103
+                    }
                 }
             },
             {
@@ -35,7 +49,14 @@
                     "endOffset": 209
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/dimens.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/dimens.xml",
+                    "position": {
+                        "startLine": 18,
+                        "startColumn": 4,
+                        "startOffset": 712,
+                        "endColumn": 49,
+                        "endOffset": 757
+                    }
                 }
             },
             {
@@ -47,7 +68,14 @@
                     "endOffset": 259
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/dimens.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/dimens.xml",
+                    "position": {
+                        "startLine": 17,
+                        "startColumn": 4,
+                        "startOffset": 662,
+                        "endColumn": 49,
+                        "endOffset": 707
+                    }
                 }
             },
             {
@@ -78,7 +106,14 @@
                     "endOffset": 446
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 11,
+                        "startColumn": 4,
+                        "startOffset": 513,
+                        "endColumn": 126,
+                        "endOffset": 635
+                    }
                 }
             },
             {
@@ -90,7 +125,14 @@
                     "endOffset": 502
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 5,
+                        "startColumn": 4,
+                        "startOffset": 231,
+                        "endColumn": 55,
+                        "endOffset": 282
+                    }
                 }
             },
             {
@@ -102,7 +144,14 @@
                     "endOffset": 564
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 6,
+                        "startColumn": 4,
+                        "startOffset": 287,
+                        "endColumn": 61,
+                        "endOffset": 344
+                    }
                 }
             },
             {
@@ -114,7 +163,14 @@
                     "endOffset": 623
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 4,
+                        "startColumn": 4,
+                        "startOffset": 172,
+                        "endColumn": 58,
+                        "endOffset": 226
+                    }
                 }
             },
             {
@@ -126,7 +182,14 @@
                     "endOffset": 650
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 8,
+                        "startColumn": 4,
+                        "startOffset": 408,
+                        "endColumn": 34,
+                        "endOffset": 438
+                    }
                 }
             },
             {
@@ -138,7 +201,14 @@
                     "endOffset": 764
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 12,
+                        "startColumn": 4,
+                        "startOffset": 640,
+                        "endColumn": 113,
+                        "endOffset": 749
+                    }
                 }
             },
             {
@@ -150,7 +220,14 @@
                     "endOffset": 821
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 3,
+                        "startColumn": 4,
+                        "startOffset": 115,
+                        "endColumn": 56,
+                        "endOffset": 167
+                    }
                 }
             },
             {
@@ -162,7 +239,14 @@
                     "endOffset": 880
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 7,
+                        "startColumn": 4,
+                        "startOffset": 349,
+                        "endColumn": 58,
+                        "endOffset": 403
+                    }
                 }
             },
             {
@@ -174,7 +258,14 @@
                     "endOffset": 950
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 14,
+                        "startColumn": 4,
+                        "startOffset": 857,
+                        "endColumn": 69,
+                        "endOffset": 922
+                    }
                 }
             },
             {
@@ -186,7 +277,14 @@
                     "endOffset": 990
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 15,
+                        "startColumn": 4,
+                        "startOffset": 927,
+                        "endColumn": 39,
+                        "endOffset": 962
+                    }
                 }
             },
             {
@@ -198,7 +296,14 @@
                     "endOffset": 1036
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 16,
+                        "startColumn": 4,
+                        "startOffset": 967,
+                        "endColumn": 45,
+                        "endOffset": 1008
+                    }
                 }
             },
             {
@@ -210,7 +315,14 @@
                     "endOffset": 1070
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 10,
+                        "startColumn": 4,
+                        "startOffset": 479,
+                        "endColumn": 33,
+                        "endOffset": 508
+                    }
                 }
             },
             {
@@ -222,7 +334,14 @@
                     "endOffset": 1173
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 13,
+                        "startColumn": 4,
+                        "startOffset": 754,
+                        "endColumn": 102,
+                        "endOffset": 852
+                    }
                 }
             },
             {
@@ -234,7 +353,14 @@
                     "endOffset": 1209
                 },
                 "from": {
-                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml"
+                    "file": "/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/src/main/res/values/strings.xml",
+                    "position": {
+                        "startLine": 9,
+                        "startColumn": 4,
+                        "startOffset": 443,
+                        "endColumn": 35,
+                        "endOffset": 474
+                    }
                 }
             }
         ]
