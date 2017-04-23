@@ -30,9 +30,9 @@ public final class R {
     public static final class id {
         public static final int atn_direct_discover=0x7f080014;
         public static final int atn_direct_enable=0x7f080013;
+        public static final int btn_StartServer=0x7f080002;
         public static final int btn_connect=0x7f080000;
         public static final int btn_disconnect=0x7f080001;
-        public static final int btn_start_client=0x7f080002;
         public static final int device_address=0x7f080003;
         public static final int device_details=0x7f080012;
         public static final int device_info=0x7f080004;
@@ -60,20 +60,21 @@ public final class R {
         public static final int action_items=0x7f070000;
     }
     public static final class string {
-        public static final int app_name=0x7f060000;
-        public static final int client_text=0x7f060001;
-        public static final int connect_peer_button=0x7f060002;
-        public static final int disconnect_peer_button=0x7f060003;
-        public static final int discover_peers_button=0x7f060004;
-        public static final int empty=0x7f060005;
-        public static final int empty_message=0x7f060006;
-        public static final int enable_p2p_button=0x7f060007;
-        public static final int get_file_button=0x7f060008;
-        public static final int group_owner_text=0x7f060009;
-        public static final int label_me=0x7f06000a;
-        public static final int label_peers=0x7f06000b;
-        public static final int no=0x7f06000c;
-        public static final int p2p_off_warning=0x7f06000d;
-        public static final int yes=0x7f06000e;
+        public static final int StartServer=0x7f060000;
+        public static final int app_name=0x7f060001;
+        public static final int client_text=0x7f060002;
+        public static final int connect_peer_button=0x7f060003;
+        public static final int disconnect_peer_button=0x7f060004;
+        public static final int discover_peers_button=0x7f060005;
+        public static final int empty=0x7f060006;
+        public static final int empty_message=0x7f060007;
+        public static final int enable_p2p_button=0x7f060008;
+        public static final int get_file_button=0x7f060009;
+        public static final int group_owner_text=0x7f06000a;
+        public static final int label_me=0x7f06000b;
+        public static final int label_peers=0x7f06000c;
+        public static final int no=0x7f06000d;
+        public static final int p2p_off_warning=0x7f06000e;
+        public static final int yes=0x7f06000f;
     }
 }
