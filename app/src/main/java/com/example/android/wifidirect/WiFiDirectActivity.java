@@ -77,6 +77,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
 
         manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
         channel = manager.initialize(this, getMainLooper(), null);
+
     }
 
     /** register the BroadcastReceiver with the intent values to be matched */
@@ -98,10 +99,9 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
      * BroadcastReceiver receiving a state change event.
      */
     public void resetData() {
-        DeviceListFragment fragmentList = (DeviceListFragment) getFragmentManager()
-                .findFragmentById(R.id.frag_list);
-        DeviceDetailFragment fragmentDetails = (DeviceDetailFragment) getFragmentManager()
-                .findFragmentById(R.id.frag_detail);
+        DeviceListFragment fragmentList = (DeviceListFragment) getFragmentManager().findFragmentById(R.id.frag_list);
+        DeviceDetailFragment fragmentDetails = (DeviceDetailFragment) getFragmentManager().findFragmentById(R.id.frag_detail);
+
         if (fragmentList != null) {
             fragmentList.clearPeers();
         }
@@ -131,7 +131,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
                     // not going to send us a result. We will be notified by
                     // WiFiDeviceBroadcastReceiver instead.
 
-                    startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
+                    startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
                 } else {
                     Log.e(TAG, "channel or manager is null");
                 }
@@ -146,6 +146,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
                 final DeviceListFragment fragment = (DeviceListFragment) getFragmentManager()
                         .findFragmentById(R.id.frag_list);
                 fragment.onInitiateDiscovery();
+
                 manager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
 
                     @Override
@@ -161,6 +162,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
                     }
                 });
                 return true;
+
             default:
                 return super.onOptionsItemSelected(item);
         }

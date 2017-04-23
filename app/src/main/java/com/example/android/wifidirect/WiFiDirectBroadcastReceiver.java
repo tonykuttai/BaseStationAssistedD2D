@@ -21,6 +21,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.NetworkInfo;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.Channel;
 import android.net.wifi.p2p.WifiP2pManager.PeerListListener;
@@ -34,6 +35,8 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
     private WifiP2pManager manager;
     private Channel channel;
     private WiFiDirectActivity activity;
+
+    private static int devices = 3;
 
     /**
      * @param manager WifiP2pManager system service
@@ -81,6 +84,8 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
             Log.d(WiFiDirectActivity.TAG, "P2P peers changed");
         } else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
 
+            Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion ");
+
             if (manager == null) {
                 return;
             }
@@ -88,14 +93,27 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
             NetworkInfo networkInfo = (NetworkInfo) intent
                     .getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
 
+            WifiP2pGroup wifiP2pGroupinfo = (WifiP2pGroup) intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_GROUP);
+
+
             if (networkInfo.isConnected()) {
 
                 // we are connected with the other device, request connection
                 // info to find group owner IP
 
+                Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion " + " Network Connected");
                 DeviceDetailFragment fragment = (DeviceDetailFragment) activity
                         .getFragmentManager().findFragmentById(R.id.frag_detail);
-                manager.requestConnectionInfo(channel, fragment);
+                Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion " +" : Clients connected "+ wifiP2pGroupinfo.getClientList().size());
+
+                if(wifiP2pGroupinfo.isGroupOwner() && wifiP2pGroupinfo.getClientList().size() == devices){
+                    Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion "+ "is GroupOwner");
+                    manager.requestGroupInfo(channel,fragment);
+                }else {
+                    Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion "+ "Request channel info");
+                    manager.requestConnectionInfo(channel, fragment);
+                }
+
             } else {
                 // It's a disconnect
                 activity.resetData();

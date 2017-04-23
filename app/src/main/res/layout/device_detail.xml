@@ -27,11 +27,11 @@
                 android:layout_height="wrap_content"
                 android:text="@string/disconnect_peer_button" />
             <Button
-                android:id="@+id/btn_start_client"
+                android:id="@+id/btn_StartServer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/get_file_button"
-                android:visibility="gone" />
+                android:text="@string/StartServer"
+                android:visibility="invisible"/>
         </LinearLayout>
         <TextView
             android:id="@+id/device_address"

@@ -27,7 +27,7 @@
             android:layout_height="0dip"
             android:layout_weight="1"
             android:id="@+id/device_details"
-            android:singleLine="true"
+            android:maxLines="1"
             android:ellipsize="marquee" />
     </LinearLayout>
 </LinearLayout>
