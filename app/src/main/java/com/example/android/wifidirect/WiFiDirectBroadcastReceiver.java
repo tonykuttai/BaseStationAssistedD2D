@@ -36,8 +36,6 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
     private Channel channel;
     private WiFiDirectActivity activity;
 
-    private static int devices = 3;
-
     /**
      * @param manager WifiP2pManager system service
      * @param channel Wifi p2p channel
@@ -101,18 +99,21 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
                 // we are connected with the other device, request connection
                 // info to find group owner IP
 
-                Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion " + " Network Connected");
+                Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection Changed Action " + " Network Connected");
                 DeviceDetailFragment fragment = (DeviceDetailFragment) activity
                         .getFragmentManager().findFragmentById(R.id.frag_detail);
-                Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion " +" : Clients connected "+ wifiP2pGroupinfo.getClientList().size());
+                Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection Changed Action " +" : Clients connected "+ wifiP2pGroupinfo.getClientList().size());
 
-                if(wifiP2pGroupinfo.isGroupOwner() && wifiP2pGroupinfo.getClientList().size() == devices){
+                /*if(wifiP2pGroupinfo.isGroupOwner() && wifiP2pGroupinfo.getClientList().size() == devices){
                     Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion "+ "is GroupOwner");
                     manager.requestGroupInfo(channel,fragment);
                 }else {
                     Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection CHanged ACtion "+ "Request channel info");
                     manager.requestConnectionInfo(channel, fragment);
-                }
+                }*/
+
+                Log.d(WiFiDirectActivity.TAG,"WIFI P2P Connection Changed Action : Request Channel Info");
+                manager.requestConnectionInfo(channel,fragment);
 
             } else {
                 // It's a disconnect
