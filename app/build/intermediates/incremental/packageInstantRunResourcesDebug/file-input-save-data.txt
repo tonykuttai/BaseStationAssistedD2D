@@ -1,5 +1,5 @@
 #Internal package file, do not edit.
-#Sun Apr 30 01:47:51 IST 2017
+#Mon May 01 11:14:02 IST 2017
 8.set=ASSET
 1.base=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_
 1.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/res/menu/action_items.xml
@@ -8,7 +8,7 @@
 15.set=ANDROID_RESOURCE
 4.set=ANDROID_RESOURCE
 5.base=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_
-5.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/res/drawable-hdpi-v4/icon.png
+5.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/AndroidManifest.xml
 7.base=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_
 7.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/res/layout-land/main.xml
 11.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/res/layout/row_devices.xml
@@ -30,7 +30,7 @@
 6.set=ANDROID_RESOURCE
 2.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/res/drawable/details_view.xml
 2.base=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_
-4.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/AndroidManifest.xml
+4.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/res/drawable-hdpi-v4/icon.png
 4.base=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_
 6.base=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_
 6.file=/home/tony/Dropbox/Research Wireless/4th Semester/Android/WifiNetworking/app/build/intermediates/res/resources-debug.ap_/res/drawable/machine.png
