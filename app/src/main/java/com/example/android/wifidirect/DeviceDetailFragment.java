@@ -22,19 +22,17 @@ import android.content.Context;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
-import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pInfo;
-import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.ConnectionInfoListener;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-
 import com.example.android.wifidirect.DeviceListFragment.DeviceActionListener;
 
 import java.io.BufferedInputStream;
@@ -54,12 +52,14 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A fragment that manages a particular peer and allows interaction with device
  * i.e. setting up network connection and transferring data.
  */
-public class DeviceDetailFragment extends Fragment implements ConnectionInfoListener,WifiP2pManager.GroupInfoListener {
+public class DeviceDetailFragment extends Fragment implements ConnectionInfoListener {
 
     protected static final int CHOOSE_FILE_RESULT_CODE = 20;
     private View mContentView = null;
@@ -71,16 +71,32 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
     private static final int SOCKET_TIMEOUT = 5000;
     public static int devices = 3;
     public String[] clientAddresses;
-    public boolean isClientAddressAvailable = false;
-    public TextView resultTextView;
-    public static int parentIndex = 0;
+    public int clientsConnectedAddress;
 
-    public static int groupMembersConnected = 0;
+    public TextView resultTextView;
+    public TextView clientAddress;
+
     public static boolean isGroupOwnerThread = false;
+
+    public boolean[] CLCONNECTED;
+
+    // For storing the file transfer history
+    public boolean[][] GOMAT;
+    public boolean[] CLMAT;
+
+    private ProgressDialog cProgress;
+    private Handler cHandler;
+
+    private final Lock[] clientlock = new Lock[devices];
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+
+        for (int i = 0; i < clientlock.length; i++) {
+            clientlock[i] = new ReentrantLock();
+        }
+        clientsConnectedAddress = 0;
     }
 
     public void setIsGroupOwnerThread(boolean b){
@@ -91,6 +107,28 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         clientAddresses = new String[devices];
+        GOMAT = new boolean[devices][devices];
+        CLMAT = new boolean[devices];
+        CLCONNECTED = new boolean[devices];
+
+        cHandler = new Handler();
+
+        cProgress = new ProgressDialog(getActivity());
+        cProgress.setMax(100);
+        cProgress.setCancelable(false);
+        cProgress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+
+        for (int i = 0;i < devices;i++){
+            CLMAT[i] = false;
+            CLCONNECTED[i] = false;
+            for (int j = 0;j < devices;j++){
+                if(i != j){
+                    GOMAT[i][j] = false;
+                }else {
+                    GOMAT[i][j] = true;
+                }
+            }
+        }
     }
 
     @Override
@@ -123,32 +161,12 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                         ((DeviceActionListener) getActivity()).disconnect();
                     }
                 });
-        mContentView.findViewById(R.id.btn_StartServer).setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        //Start the file transfer service at the server
-                        new GroupOwnerFileTransferThread().execute(clientAddresses);
-
-                    }
-                }
-        );
 
         resultTextView = (TextView) mContentView.findViewById(R.id.resultData);
+        clientAddress = (TextView) mContentView.findViewById(R.id.group_client);
         return mContentView;
     }
 
-    @Override
-    public void onGroupInfoAvailable(WifiP2pGroup group) {
-        Log.d(WiFiDirectActivity.TAG,"ONGROUPINFOAVAILABLE : Entered");
-        if(group.getClientList().size() == devices){
-            //all members have joined. start the communication between server and client
-            if(group.isGroupOwner()){
-                mContentView.findViewById(R.id.btn_StartServer).setVisibility(View.VISIBLE);
-            }
-        }
-
-    }
 
     @Override
     public void onConnectionInfoAvailable(final WifiP2pInfo info) {
@@ -159,6 +177,9 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         }
         this.info = info;
         this.getView().setVisibility(View.VISIBLE);
+        
+        Thread peer = null;
+
 
         // The owner IP is now known.
         TextView view = (TextView) mContentView.findViewById(R.id.group_owner);
@@ -176,10 +197,11 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             Log.d(WiFiDirectActivity.TAG,"ON Connection Info Available : group formed and is group owner");
 
             if(!isGroupOwnerThread){
+                Log.d(WiFiDirectActivity.TAG,"ON Connection Info Available : group owner Thread check");
                 setIsGroupOwnerThread(true);
                 clientAddresses[0] = info.groupOwnerAddress.getHostAddress();
 
-                // Async task for server Getting the IP addresses of client : Listening to the server connections
+                // Async task for server : Listens to client Connections
                 new GroupOwnerThread(getActivity(), mContentView.findViewById(R.id.group_client)).execute();
 
             }
@@ -190,10 +212,11 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 
             Log.d(WiFiDirectActivity.TAG,"ON Connection Info Available : Group formed Not group owner");
             String groupOwnerIP = info.groupOwnerAddress.getHostAddress();
-            new PeerThread(getActivity(),mContentView.findViewById(R.id.group_client)).execute(groupOwnerIP);
+
+            //Start an AsyncTask for groupMember : Peer thread
+            new GroupMemberTask((getActivity())).execute(groupOwnerIP);
 
         }
-
         // hide the connect button
         mContentView.findViewById(R.id.btn_connect).setVisibility(View.GONE);
     }
@@ -230,165 +253,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         this.getView().setVisibility(View.GONE);
     }
 
-
-    private class GroupOwnerFileTransferThread extends AsyncTask<String[],Void,Void>{
-
-
-        private int noOfClients = devices - 1;
-
-        @Override
-        protected void onPreExecute() {
-            resultTextView.setText("Group Owner File Transfer Service Starting");
-        }
-
-        @Override
-        protected Void doInBackground(String[]... params) {
-            String[] allDeviceIP = params[0];
-
-            // Receiving file parts from all the clients
-
-            while(noOfClients > 0){
-                Socket socket = new Socket();
-
-                try {
-                    Log.d(WiFiDirectActivity.TAG,"GO Connecting to client "+clientAddresses[noOfClients]);
-                    socket.connect(new InetSocketAddress(clientAddresses[noOfClients],mPortData),SOCKET_TIMEOUT);
-
-                    Log.d(WiFiDirectActivity.TAG,"Successfully connected to the Client " + clientAddresses[noOfClients] );
-
-                    DataInputStream dataIn = new DataInputStream(socket.getInputStream());
-                    DataOutputStream dataOut = new DataOutputStream(socket.getOutputStream());
-
-                    dataOut.writeUTF("SENDDATA");
-                    dataOut.flush();
-
-                    int rIndex = (int) dataIn.readInt();
-                    long size = dataIn.readLong();
-
-                    String fileName = "ReceivedFile.chunk"+rIndex;
-
-                    File rFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+ fileName);
-                    File dirs = new File(rFile.getParent());
-                    if (!dirs.exists())
-                        dirs.mkdirs();
-                    rFile.createNewFile();
-
-                    Log.d(WiFiDirectActivity.TAG, "GO: receiving file from client : "+clientAddresses[noOfClients] +" : " + rFile.getAbsolutePath());
-
-                    if(copyFile(dataIn, new FileOutputStream(rFile),size)){
-                        Log.d(WiFiDirectActivity.TAG,"File Received Successfully from client : "+clientAddresses[noOfClients]);
-                    }else{
-                        Log.d(WiFiDirectActivity.TAG,"File receiving Failed from Client : "+ clientAddresses[noOfClients]);
-                    }
-
-                    noOfClients--;
-
-                    dataOut.close();
-                    dataIn.close();
-                    socket.close();
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-            }
-
-            //Copy server file part from FILE folder to SERVER Folder
-            String sfileName = "D2DFile.part0";
-            String destfileName = "ReceivedFile.chunk0";
-            File serverFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Files/" + sfileName );
-            File destFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+ destfileName);
-            try {
-                if(copyFiletoAnotherFolder(serverFile,destFile)){
-                    Log.d(WiFiDirectActivity.TAG,"File Copied to : "+ destFile.getAbsolutePath());
-
-                }else{
-                    Log.d(WiFiDirectActivity.TAG,"File Copying Failed to : "+ destFile.getAbsolutePath());
-
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            //Send all files to all the clients
-            String inputLine;
-            for(int client = 1;client < devices;client++){
-                Socket socket = new Socket();
-                try {
-
-                    socket.connect(new InetSocketAddress(clientAddresses[client],mPortData),SOCKET_TIMEOUT);
-
-                    Log.d(WiFiDirectActivity.TAG,"Successfully connected to the Client " + clientAddresses[client] );
-
-                    DataInputStream dataIn = new DataInputStream(socket.getInputStream());
-                    DataOutputStream dataOut = new DataOutputStream(socket.getOutputStream());
-
-                    dataOut.writeUTF("SENDING");
-                    dataOut.flush();
-
-                    dataOut.writeInt(devices - 1); // No of parts
-                    dataOut.flush();
-
-                    for(int part = 0;part < devices;part++){
-                        if(client != part){
-
-                            //send the file part
-                            String fileName = "ReceivedFile.chunk"+part;
-                            File sFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Received/"+ fileName);
-                            long size = sFile.length();
-                            byte[] byteArray = new byte[(int) size];
-
-                            FileInputStream fis = new FileInputStream(sFile);
-                            BufferedInputStream bis = new BufferedInputStream(fis);
-                            DataInputStream dis = new DataInputStream(bis);
-                            dis.readFully(byteArray,0,byteArray.length);
-
-                            Log.d(WiFiDirectActivity.TAG,"Sending data to the Client :" + fileName );
-
-                            dataOut.writeInt(part);
-                            dataOut.writeLong(size);
-                            dataOut.flush();
-
-                            dataOut.write(byteArray,0,byteArray.length);
-                            dataOut.flush();
-
-                            while ((inputLine = dataIn.readUTF()) != null){
-                                if(inputLine.equalsIgnoreCase("END")){
-                                    break;
-                                }
-                            }
-
-                        }
-                    }
-
-
-                    dataOut.close();
-                    dataIn.close();
-                    socket.close();
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                Log.d(WiFiDirectActivity.TAG,"File Send to client : "+clientAddresses[client]);
-
-
-            }
-
-
-
-
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void aVoid) {
-            resultTextView.setText("File sharing success");
-        }
-    }
-
-
-    private class GroupOwnerThread extends AsyncTask<Void,Void,Void>{
+    private class GroupOwnerThread extends AsyncTask<Void,String[],Void>{
 
         private Context context;
         private TextView clients;
@@ -403,7 +268,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 
         @Override
         protected void onPreExecute() {
-            resultTextView.setText("Group Owner Listening for clients to connect on control Port");
+            resultTextView.setText("Group Owner Listening for clients to connect");
         }
 
         @Override
@@ -411,26 +276,30 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             int connections = 1;
 
             try {
+                Log.d(WiFiDirectActivity.TAG,"AsyncTask Group Owner Thread Running");
+
                 ServerSocket serverSocket = new ServerSocket(mPortControl);
                 serverSocket.setReuseAddress(true);
-
-                noOfClients = devices - 1;
 
                 Thread[] threads = new Thread[noOfClients];
                 int count = 0;
 
                 while(noOfClients > 0) {
-                    threads[count] = new Thread(new MultiServerThread(serverSocket.accept(),connections++));
+
+                    threads[count] = new Thread(new GOClientHandler(serverSocket.accept(),connections++));
                     threads[count].start();
                     noOfClients--;
                     count++;
                 }
                 serverSocket.close();
 
+                while(clientsConnectedAddress < (devices - 1));
+
+                publishProgress(clientAddresses);
+
                 for (Thread thread : threads){
                     thread.join();
                 }
-
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (InterruptedException e) {
@@ -441,50 +310,334 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         }
 
         @Override
+        protected void onProgressUpdate(String[]... values) {
+            super.onProgressUpdate(values);
+            String textString = "";
+            for(int j = 0; j < devices;j++){
+                textString = textString + clientAddresses[j] + " \n ";
+            }
+            clients.setText("Clients Connected : File transfer in Progress \n" + textString);
+            resultTextView.setText("");
+        }
+
+        @Override
         protected void onPostExecute(Void aVoid) {
             super.onPostExecute(aVoid);
             String textString = "";
             for(int j = 0; j < devices;j++){
                 textString = textString + clientAddresses[j] + " \n ";
             }
-            clients.setText("Clients Connected IP \n" + textString);
-            resultTextView.setText("Received All IP Addresses at Server");
+            clients.setText("Clients :" + textString);
+            resultTextView.setText("File parts Successfully Shared with all the devices");
+        }
+    }
 
-            new GroupOwnerFileTransferThread().execute(clientAddresses);
+    private class GOClientHandler implements Runnable{
+        private Socket socket = null;
+        private int index;
+        String inputLine = "";
+        String clientIP = "";
+
+        public GOClientHandler(Socket s,int ind){
+            this.socket = s;
+            this.index = ind;
+        }
+
+        @Override
+        public void run() {
+
+            //Get the client IP and send it back
+            clientlock[index].lock();
+            try {
+                Log.d(WiFiDirectActivity.TAG,"GOClient Handler : client Index "+ index);
+                CLCONNECTED[index] = true;
+                PrintWriter out = new PrintWriter(socket.getOutputStream(),true);
+                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+                while((inputLine = in.readLine()) != null){
+                    if(inputLine.equalsIgnoreCase("CLIENTIP")){
+                        //Send the Client IP Address
+                        clientIP = socket.getInetAddress().getHostAddress();
+                        out.println(clientIP);
+                        out.flush();
+                        out.println(index);
+                        out.flush();
+                        clientAddresses[index] = clientIP;
+                        break;
+                    }
+                }
+
+                out.close();
+                in.close();
+                socket.close();
+                Log.d(WiFiDirectActivity.TAG,"GOClient Handler : client Index "+ index + " \n Received Client IP" );
+                clientsConnectedAddress++; //for displaying the clients connected IP in the UI Thread
+                Thread.sleep(2000);
+
+                //Receiving the Client chunk
+                Socket cSocket = new Socket();
+                Log.d(WiFiDirectActivity.TAG,"client Index : "+ index + " GO Connecting to client "+clientIP);
+                cSocket.connect(new InetSocketAddress(clientIP,mPortData));
+
+                Log.d(WiFiDirectActivity.TAG,"client Index : "+ index + "Successfully Connected to the Client " + clientIP);
+
+                DataInputStream dataIn = new DataInputStream(cSocket.getInputStream());
+                DataOutputStream dataOut = new DataOutputStream(cSocket.getOutputStream());
+
+                dataOut.writeUTF("SENDDATA");
+                dataOut.flush();
+
+                int rIndex = (int) dataIn.readInt();
+                long size = dataIn.readLong();
+
+                String fileName = "ReceivedFile.chunk"+rIndex;
+
+                File rFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+ fileName);
+                File dirs = new File(rFile.getParent());
+                if (!dirs.exists())
+                    dirs.mkdirs();
+                rFile.createNewFile();
+
+                Log.d(WiFiDirectActivity.TAG, "client Index : "+ index + " GO: receiving file from client : "+clientIP +" : " + rFile.getAbsolutePath());
+
+                if(copyFile(dataIn, new FileOutputStream(rFile),size)){
+                    Log.d(WiFiDirectActivity.TAG,"client Index : "+ index + " File Received Successfully from client : "+clientIP);
+                    GOMAT[0][index] = true;
+                }else{
+                    Log.d(WiFiDirectActivity.TAG,"client Index : "+ index + " File receiving Failed from Client : "+ clientIP);
+                    GOMAT[0][index] = false;
+                }
+
+
+                // Send the GO file to the client
+                Log.d(WiFiDirectActivity.TAG,"client Index : "+ index + " Sending GO file to the Client");
+                dataOut.writeUTF("GOFILEREADY");
+                dataOut.flush();
+
+                String gofileName = "ReceivedFile.chunk";
+                File goFile = new File(Environment.getExternalStorageDirectory()+ "/WifiNetworking/" + "/MobileData/" + gofileName);
+
+                size = goFile.length();
+                byte[] byteArray = new byte[(int) size];
+
+                FileInputStream fis = new FileInputStream(goFile);
+                BufferedInputStream bis = new BufferedInputStream(fis);
+                DataInputStream dis = new DataInputStream(bis);
+                dis.readFully(byteArray,0,byteArray.length);
+
+                Log.d(WiFiDirectActivity.TAG,"client Index : "+ index +"Sending GO File to the Client : "+clientIP +"  File Name :"+ gofileName );
+
+                dataOut.writeLong(size);
+                dataOut.flush();
+
+                dataOut.write(byteArray,0,byteArray.length);
+                dataOut.flush();
+
+                dataOut.writeUTF("ENDGOFILE");
+                dataOut.flush();
+
+                Log.d(WiFiDirectActivity.TAG,"client Index : "+ index +"Sending GO File to the Client : "+clientIP +"  File Name :"+ gofileName +" Success" );
+
+                GOMAT[index][0] = true;
+
+                //Send missing file parts to the client
+
+                if(index > 1){
+                    Log.d(WiFiDirectActivity.TAG,"client Index : "+ index +"Sending Missing File Parts to the Client : "+clientIP);
+
+                    dataOut.writeUTF("MISSINGPARTS");
+                    dataOut.flush();
+
+                    dataOut.writeInt(index - 1); //No of missing parts
+                    dataOut.flush();
+
+                    for (int miss = 1;miss < index;miss++){
+                        if(GOMAT[index][miss] == false){
+                            //File missing at the client .Send the files
+                            fileName = "ReceivedFile.chunk"+miss;
+                            File cFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Received/"+ fileName);
+                            long cSize = cFile.length();
+                            byte[] cByteArray = new byte[(int) cSize];
+
+                            FileInputStream cfis = new FileInputStream(cFile);
+                            BufferedInputStream cbis = new BufferedInputStream(cfis);
+                            DataInputStream cdis = new DataInputStream(cbis);
+                            cdis.readFully(cByteArray,0,cByteArray.length);
+
+                            Log.d(WiFiDirectActivity.TAG,"Sending missing data to the Client :" + fileName );
+
+                            dataOut.writeInt(miss);
+                            dataOut.writeLong(cSize);
+                            dataOut.flush();
+
+                            dataOut.write(cByteArray,0,cByteArray.length);
+                            dataOut.flush();
+
+                            GOMAT[index][miss] = true;
+                        }
+                    }
+
+                    dataOut.writeUTF("ENDMISSINGPARTS");
+                    dataOut.flush();
+
+                    while ((inputLine = dataIn.readUTF()) != null){
+                        if(inputLine.equalsIgnoreCase("END")){
+                            break;
+                        }
+                    }
+                }else{
+                    dataOut.writeUTF("NOMISSINGPARTS");
+                    dataOut.flush();
+                }
+
+                dataOut.close();
+                dataIn.close();
+                cSocket.close();
+                CLCONNECTED[index] = false; //Client disconnected
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }finally {
+                clientlock[index].unlock();
+            }
+
+            boolean allTransferred = false;
+            int tranCount = 0;
+
+            //Initiate connection to other clients and transfer the missing file ie current index file
+            String fileName = "ReceivedFile.chunk"+index;
+            File cFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Received/"+ fileName);
+            long cSize = cFile.length();
+            byte[] cByteArray = new byte[(int) cSize];
+
+            FileInputStream cfis = null;
+            try {
+                cfis = new FileInputStream(cFile);
+
+                BufferedInputStream cbis = new BufferedInputStream(cfis);
+                DataInputStream cdis = new DataInputStream(cbis);
+                cdis.readFully(cByteArray,0,cByteArray.length);
+
+
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
+            Log.d(WiFiDirectActivity.TAG,"Client Index " + index + " Transferring the files to other clients: while loop");
+            for (int cMiss = 1; cMiss < index;cMiss++){
+                if(GOMAT[cMiss][index] == false){
+                    Socket mSocket = new Socket();
+                    clientlock[cMiss].lock();
+                    try {
+                        Log.d(WiFiDirectActivity.TAG,"Client Index :" + index + " Connecting to client " + clientAddresses[cMiss]);
+                        mSocket.connect(new InetSocketAddress(clientAddresses[cMiss],mPortData),SOCKET_TIMEOUT);
+                        Log.d(WiFiDirectActivity.TAG,"Successfully Connected to client " + clientAddresses[cMiss]);
+
+                        CLCONNECTED[cMiss] = true;
+                        DataInputStream dataIn = new DataInputStream(mSocket.getInputStream());
+                        DataOutputStream dataOut = new DataOutputStream(mSocket.getOutputStream());
+
+                        dataOut.writeUTF("RESTDATA");
+                        dataOut.flush();
+
+                        Log.d(WiFiDirectActivity.TAG,"Sending REST data to the Client :"+clientAddresses[cMiss] +" : file : " +fileName );
+
+                        dataOut.writeInt(index);
+                        dataOut.writeLong(cSize);
+                        dataOut.flush();
+
+                        dataOut.write(cByteArray,0,cByteArray.length);
+                        dataOut.flush();
+
+                        GOMAT[cMiss][index] = true;
+                        dataOut.writeUTF("ENDRESTDATA");
+                        dataOut.flush();
+
+                        while ((inputLine = dataIn.readUTF()) != null){
+                            if(inputLine.equalsIgnoreCase("END")){
+                                break;
+                            }
+                        }
+
+                        Log.d(WiFiDirectActivity.TAG,"Sending REST data to the Client :"+clientAddresses[cMiss] +" Success : " +fileName );
+                        dataOut.close();
+                        dataIn.close();
+                        mSocket.close();
+                        tranCount++;
+                        CLCONNECTED[cMiss] = false;
+
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }finally {
+                        clientlock[cMiss].unlock();
+                    }
+                }
+
+            }
+
+            //File transfer of self files to the Received Folder to validate
+            String GOFileName = "ReceivedFile.chunk";
+            File clientFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/MobileData/"+ GOFileName);
+
+            String moveFileName = "ReceivedFile.MobileDataChunk";
+            File moveFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+moveFileName);
+
+            try {
+                File dirs = new File(moveFile.getParent());
+                if(!dirs.exists()){
+                    dirs.mkdirs();
+                }
+                moveFile.createNewFile();
+                copyFiletoAnotherFolder(clientFile,moveFile);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            Log.d(WiFiDirectActivity.TAG,"Client : index "+ index + "GOCLIENTHANDLER EXITING");
 
         }
     }
 
-
-    private class PeerThread extends AsyncTask<String,Void,Void>{
-
+    private class GroupMemberTask extends AsyncTask<String,String,String[]>{
         private Context context;
-        private TextView clientIPText;
-        private int index = 0;
+        private int cIndex = 0;
+        private String groupOwnerIP;
+        private String fileName;
+        String clientIP = "0.0.0.0";
+        String inputLine = "";
+        String[] receivedFiles = new String[devices];
+        int noOfMissing = 0;
+        int rIndex = 0;
 
-        public PeerThread(Context con,View c){
-            this.context = con;
-            this.clientIPText = (TextView) c;
+        public GroupMemberTask(Context context) {
+            super();
+            this.context = context;
         }
 
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            resultTextView.setText("Peer Thread Listening at Client");
+            resultTextView.setText("GroupMember Connecting to the GO");
         }
 
         @Override
-        protected Void doInBackground(String... params) {
-            String groupOwnerIP = params[0];
-            String clientIP = "0.0.0.0";
-            String inputLine;
-
+        protected String[] doInBackground(String... params) {
+            groupOwnerIP = params[0];
+            for(int q = 0;q < devices;q++){
+                receivedFiles[q] = "";
+            }
             // Pinging the server to get IP addresses
             Socket clientSocket = new Socket();
 
             try {
-                Log.d(WiFiDirectActivity.TAG,"Start Wait of 10 seconds ");
-                Thread.sleep(10000);
+                Log.d(WiFiDirectActivity.TAG,"Start Wait of 3 seconds ");
+                Thread.sleep(3000);
                 clientSocket .setReuseAddress(true);
                 clientSocket.connect((new InetSocketAddress(groupOwnerIP, mPortControl)), SOCKET_TIMEOUT);
                 Log.d(WiFiDirectActivity.TAG,"Connected to GO Success");
@@ -492,16 +645,19 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
                 BufferedReader in = new BufferedReader(new InputStreamReader((clientSocket.getInputStream())));
 
+                publishProgress(new String("STARTCLIENTIP"));
+
                 out.println("CLIENTIP");
                 out.flush();
 
                 while ((inputLine = in.readLine()) != null) {
                     clientIP = inputLine;
-                    index = Integer.parseInt(in.readLine());
+                    cIndex = Integer.parseInt(in.readLine());
                     break;
                 }
-                Log.d(WiFiDirectActivity.TAG,"Received CLient IP " + clientIP);
+                Log.d(WiFiDirectActivity.TAG,"Received Client IP " + clientIP + " Index :" + cIndex);
 
+                publishProgress(new String("STOPCLIENTIP"));
                 out.close();
                 in.close();
                 clientSocket.close();
@@ -518,11 +674,19 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             //Waiting for the server to connect to client and send the file part to GO
 
             try {
-                Log.d(WiFiDirectActivity.TAG,"Waiting for the server to connect to client and send the file part to GO");
-                String fileName = "D2DFile.part"+index;
-                File sFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Files/" + fileName);
+                ServerSocket peerSocket = new ServerSocket(mPortData);
+                peerSocket.setReuseAddress(true);
 
-                Log.d(WiFiDirectActivity.TAG,"Sending Client File to GO : " + sFile.getAbsolutePath());
+                Socket groupOwner = peerSocket.accept();
+                Log.d(WiFiDirectActivity.TAG,"GO connection accepted, sending data");
+
+                Log.d(WiFiDirectActivity.TAG,"Waiting for the server to connect to client and send the file part to GO");
+                fileName = "ReceivedFile.chunk";
+                File sFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/MobileData/" + fileName);
+
+                receivedFiles[cIndex] = fileName; //storing the received file Name
+
+                Log.d(WiFiDirectActivity.TAG,"Preparing Client File : " + sFile.getAbsolutePath());
 
                 long size = sFile.length();
                 byte[] byteArray = new byte[(int) size];
@@ -531,28 +695,104 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 DataInputStream dis = new DataInputStream(bis);
                 dis.readFully(byteArray,0,byteArray.length);
 
-                ServerSocket peerSocket = new ServerSocket(mPortData);
-                peerSocket.setReuseAddress(true);
-
-                Socket groupOwner = peerSocket.accept();
-
-                Log.d(WiFiDirectActivity.TAG,"GO connection accepted, sending data");
-
                 DataInputStream serverData = new DataInputStream(groupOwner.getInputStream());
                 DataOutputStream clientData = new DataOutputStream(groupOwner.getOutputStream());
 
+                publishProgress(new String("STARTSENDCLIENTFILE"));
+
                 while((inputLine = serverData.readUTF()) != null){
                     if(inputLine.equalsIgnoreCase("SENDDATA")){
-                        clientData.writeInt(index);
+                        clientData.writeInt(cIndex);
                         clientData.writeLong(size);
                         clientData.write(byteArray,0,byteArray.length);
                         clientData.flush();
                         break;
                     }
                 }
+                publishProgress(new String("STOPSENDCLIENTFILE"));
 
                 clientData.flush();
-                Log.d(WiFiDirectActivity.TAG,"Data send to GO");
+                Log.d(WiFiDirectActivity.TAG,"Client Data send to GO");
+
+
+                //Receiving the GO File part from GO
+
+                while ((inputLine = serverData.readUTF()) != null){
+                    if(inputLine.equalsIgnoreCase("GOFILEREADY")){
+                        size = serverData.readLong();
+                        fileName = "ReceivedFile.chunk0";
+
+                        File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+fileName);
+                        File dirs = new File(receivedFile.getParent());
+                        if(!dirs.exists()){
+                            dirs.mkdirs();
+                        }
+                        receivedFile.createNewFile();
+                        publishProgress(new String("STARTRECEIVEGOFILE"));
+
+                        if(copyFile(serverData,new FileOutputStream(receivedFile),size)){
+                            Log.d(WiFiDirectActivity.TAG,"File Part received Successfully");
+                            receivedFiles[0] = fileName;
+                            publishProgress(new String("STOPRECEIVEGOFILE"));
+                        }else {
+                            Log.d(WiFiDirectActivity.TAG,"Failed to receive File Part from GO");
+                            publishProgress(new String("ERRORRECEIVEGOFILE"));
+                        }
+
+
+                    }else if(inputLine.equalsIgnoreCase("ENDGOFILE")){
+                        Log.d(WiFiDirectActivity.TAG,"ENDING GO FILE Transmission");
+                        break;
+                    }
+                }
+
+
+
+                //Receive Missing files from the server
+                while ((inputLine = serverData.readUTF()) != null){
+                    if(inputLine.equalsIgnoreCase("MISSINGPARTS")){
+                        noOfMissing = serverData.readInt();
+
+                        publishProgress(new String("STARTRECEIVEMISSINGFILES"));
+
+                        for(int miss = 1; miss <= noOfMissing; miss++ ){
+                            rIndex = serverData.readInt();
+                            size = serverData.readLong();
+
+                            fileName = "ReceivedFile.chunk"+rIndex;
+                            File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+fileName);
+                            File dirs = new File(receivedFile.getParent());
+                            if(!dirs.exists()){
+                                dirs.mkdirs();
+                            }
+                            receivedFile.createNewFile();
+
+
+                            if(copyFile(serverData,new FileOutputStream(receivedFile),size)){
+                                receivedFiles[rIndex] = fileName;
+                                Log.d(WiFiDirectActivity.TAG,"File Part received Successfully");
+                                publishProgress(new String("STOPRECEIVEMISSINGFILES"));
+                            }else {
+                                Log.d(WiFiDirectActivity.TAG,"Failed to receive File Part from GO");
+                                publishProgress(new String("ERRORRECEIVEMISSINGFILES"));
+                            }
+
+
+
+                        }
+
+                        if(serverData.readUTF().equalsIgnoreCase("ENDMISSINGPARTS")){
+                            clientData.writeUTF("END");
+                            clientData.flush();
+                            break;
+                        }
+
+
+                    }else if(inputLine.equalsIgnoreCase("NOMISSINGPARTS")){
+                        break;
+                    }
+                }
+
                 clientData.close();
                 serverData.close();
                 peerSocket.close();
@@ -561,87 +801,138 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 e.printStackTrace();
             }
 
-            //waiting for the server to connect to client and get all the remaining parts from the server
-            int rIndex = 0;
-            int noOfparts = 0;
 
-            try {
-                Log.d(WiFiDirectActivity.TAG,"witing to get all the remaining parts from the server");
-                ServerSocket peerSocket = new ServerSocket(mPortData);
-                peerSocket.setReuseAddress(true);
-                Socket groupOwner = peerSocket.accept();
-                Log.d(WiFiDirectActivity.TAG,"GO connection accepted, receiving data");
+            // Wait for the server to connect and transfer the missing file
+            for(int waitServer = 0; waitServer < (devices - cIndex - 1);waitServer++) {
+                try {
+                    ServerSocket peerSocket = new ServerSocket(mPortData);
+                    peerSocket.setReuseAddress(true);
+                    publishProgress(new String("WAITINGFORADDITIONALCLIENTFILES"));
+                    Socket groupOwner = peerSocket.accept();
+                    Log.d(WiFiDirectActivity.TAG, "GO connection accepted, Preparing to receive data");
 
-                DataInputStream serverData = new DataInputStream(groupOwner.getInputStream());
-                DataOutputStream outData = new DataOutputStream(groupOwner.getOutputStream());
+                    DataInputStream dataIn = new DataInputStream(groupOwner.getInputStream());
+                    DataOutputStream dataOut = new DataOutputStream(groupOwner.getOutputStream());
 
-                while((inputLine = serverData.readUTF()) != null){
-                    if(inputLine.equalsIgnoreCase("SENDING")){
-                        noOfparts = serverData.readInt();
+                    while ((inputLine = dataIn.readUTF()) != null) {
+                        if (inputLine.equalsIgnoreCase("RESTDATA")) {
+                            rIndex = dataIn.readInt();
+                            long size = dataIn.readLong();
 
-                        Log.d(WiFiDirectActivity.TAG,"Peer Thread : Receiving Parts : NoOfParts = "+noOfparts);
-
-                        for(int parts = 0;parts < noOfparts;parts++){
-                            rIndex = serverData.readInt();
-                            long size = serverData.readLong();
-
-                            String fileName = "ReceivedFile.chunk"+rIndex;
-
-                            File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+fileName);
+                            fileName = "ReceivedFile.chunk" + rIndex;
+                            File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/" + fileName);
                             File dirs = new File(receivedFile.getParent());
-                            if(!dirs.exists()){
+                            if (!dirs.exists()) {
                                 dirs.mkdirs();
                             }
                             receivedFile.createNewFile();
 
-                            if(copyFile(serverData,new FileOutputStream(receivedFile),size)){
-                                Log.d(WiFiDirectActivity.TAG,"File Part received Successfully");
-                            }else {
-                                Log.d(WiFiDirectActivity.TAG,"Failed to receive File Part from GO");
+                            publishProgress(new String("NEWCLIENTADDITIONALFILE"));
+                            if (copyFile(dataIn, new FileOutputStream(receivedFile), size)) {
+                                Log.d(WiFiDirectActivity.TAG, "File Part received Successfully");
+                                receivedFiles[rIndex] = fileName;
+                                publishProgress(new String("NEWCLIENTADDITIONALFILESUCCESS"));
+                            } else {
+                                Log.d(WiFiDirectActivity.TAG, "Failed to receive File Part from GO");
+                                publishProgress(new String("NEWCLIENTADDITIONALFILEERROR"));
                             }
-                            outData.writeUTF("END");
+
+
+                        } else if (inputLine.equalsIgnoreCase("ENDRESTDATA")) {
+                            dataOut.writeUTF("END");
+                            dataOut.flush();
+                            break;
                         }
-                        break;
                     }
-                }
-                Log.d(WiFiDirectActivity.TAG,"Received all data parts");
-                serverData.close();
-                peerSocket.close();
 
-            } catch (IOException e) {
-                e.printStackTrace();
+                    dataIn.close();
+                    dataOut.close();
+                    peerSocket.close();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+            }
+            File folder = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/");
+            File[] listOfFiles = folder.listFiles();
+            String[] receivedFiles = new String[devices - 1];
+            int count = 0;
+            for(File f : listOfFiles){
+                receivedFiles[count++] = f.getName();
             }
 
-            //Copy the file of the client based on index to Received folder
-            String sfileName = "D2DFile.part"+index;
-            String destfileName = "D2DFile.copiedPart"+index;
-            File clientFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Files/" + sfileName );
-            File destFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+ destfileName);
+            //File transfer of self files to the Received Folder to validate
+            String clientFileName = "ReceivedFile.chunk";
+            File clientFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/MobileData/"+clientFileName);
+
+            String moveFileName = "ReceivedFile.MobileDataChunk";
+            File moveFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+moveFileName);
+
             try {
-                if(copyFiletoAnotherFolder(clientFile,destFile)){
-                    Log.d(WiFiDirectActivity.TAG,"File Copied to : " + destFile.getAbsolutePath());
-                }else{
-                    Log.d(WiFiDirectActivity.TAG,"File Copying Failed to : "+ destFile.getAbsolutePath());
+                File dirs = new File(moveFile.getParent());
+                if(!dirs.exists()){
+                    dirs.mkdirs();
                 }
+                moveFile.createNewFile();
+                copyFiletoAnotherFolder(clientFile,moveFile);
             } catch (IOException e) {
                 e.printStackTrace();
             }
 
-            return null;
+
+            return receivedFiles;
         }
 
         @Override
-        protected void onPostExecute(Void aVoid) {
-            super.onPostExecute(aVoid);
-
-            resultTextView.setText("Files successfully Received");
+        protected void onProgressUpdate(String... values) {
+            Log.d(WiFiDirectActivity.TAG,"Entered onPulishProgressUpdate , String Value :" + values.toString());
+            String progress = values[0];
+            if(progress.equalsIgnoreCase("STARTCLIENTIP")){
+                resultTextView.setText("Client IP service Initiating");
+            }else if(progress.equalsIgnoreCase("STOPCLIENTIP")){
+                clientAddress.setText("Current IP : "+ clientIP);
+                resultTextView.append("\n Client IP Received");
+            }else if(progress.equalsIgnoreCase("STARTSENDCLIENTFILE")){
+                resultTextView.append("\n Sending Client File to GO");
+            }else if(progress.equalsIgnoreCase("STOPSENDCLIENTFILE")){
+                resultTextView.append("\n Client File Successfully send to GO");
+            }else if (progress.equalsIgnoreCase("STARTRECEIVEGOFILE")){
+                resultTextView.append("\n Receiving GO File ");
+            }else if(progress.equalsIgnoreCase("STOPRECEIVEGOFILE")){
+                resultTextView.append("\n GO file received successfully");
+            }else if(progress.equalsIgnoreCase("ERRORRECEIVEGOFILE")){
+                resultTextView.append("\n Error in receiving GO file");
+            }else if(progress.equalsIgnoreCase("STARTRECEIVEMISSINGFILES")){
+                resultTextView.append("\n Receiving Missing Files from GO");
+            }else if(progress.equalsIgnoreCase("STOPRECEIVEMISSINGFILES")){
+                resultTextView.append("\n Missing Files received from GO");
+            }else if(progress.equalsIgnoreCase("ERRORRECEIVEMISSINGFILES")){
+                resultTextView.append("\n Error in receiving Missing Files from GO!!!");
+            }else if(progress.equalsIgnoreCase("WAITINGFORADDITIONALCLIENTFILES")){
+                resultTextView.append("\n Waiting for New Clients to join the group and transfer Files");
+            }else if(progress.equalsIgnoreCase("NEWCLIENTADDITIONALFILE")){
+                resultTextView.append("\n New Client connected. Transferring File");
+            }else if(progress.equalsIgnoreCase("NEWCLIENTADDITIONALFILESUCCESS")){
+                resultTextView.append("\n New Client Transferring File Success");
+            }else if(progress.equalsIgnoreCase("NEWCLIENTADDITIONALFILEERROR")){
+                resultTextView.append("\n New Client Transferring File Error!!");
+            }
         }
 
+        @Override
+        protected void onPostExecute(String[] strings) {
+            resultTextView.setText("File Transfer Completed Successfully");
+            for(String file : strings){
+                resultTextView.append("\n "+file);
+            }
+        }
     }
 
     public static boolean copyFile(DataInputStream inputStream, OutputStream out,long size) {
         byte buf[] = new byte[1024];
         int bytesRead;
+
         try {
             while ((size > 0) && (bytesRead = inputStream.read(buf,0,(int)Math.min(buf.length,size))) != -1) {
                 out.write(buf, 0, bytesRead);
@@ -681,47 +972,6 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         return true;
 
     }
-
-    public class MultiServerThread implements Runnable{
-        private Socket socket = null;
-        private int index ;
-
-        public MultiServerThread(Socket s,int ind){
-            this.socket = s;
-            this.index = ind;
-        }
-
-        public void run(){
-            String inputLine,clientIP;
-
-            try {
-                PrintWriter out = new PrintWriter(socket.getOutputStream(),true);
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-
-                while((inputLine = in.readLine()) != null){
-                    if(inputLine.equalsIgnoreCase("CLIENTIP")){
-                        //Send the Client IP Address
-                        clientIP = socket.getInetAddress().getHostAddress();
-                        out.println(clientIP);
-                        out.flush();
-                        out.println(index);
-                        out.flush();
-
-                        clientAddresses[index] = clientIP;
-                        break;
-                    }
-                }
-
-                out.close();
-                in.close();
-                socket.close();
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-
-        }
-    }
-
 
 
 
