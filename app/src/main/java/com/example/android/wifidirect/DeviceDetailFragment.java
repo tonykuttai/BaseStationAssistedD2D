@@ -89,6 +89,8 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 
     private final Lock[] clientlock = new Lock[devices];
 
+    public static final int BUFFER_SIZE = 1024 * 30;
+
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
@@ -247,8 +249,8 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         view.setText(R.string.empty);
         view = (TextView) mContentView.findViewById(R.id.group_owner);
         view.setText(R.string.empty);
-        view = (TextView) mContentView.findViewById(R.id.status_text);
-        view.setText(R.string.empty);
+//        view = (TextView) mContentView.findViewById(R.id.status_text);
+//        view.setText(R.string.empty);
        // mContentView.findViewById(R.id.btn_start_client).setVisibility(View.GONE);
         this.getView().setVisibility(View.GONE);
     }
@@ -329,6 +331,13 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             }
             clients.setText("Clients :" + textString);
             resultTextView.setText("File parts Successfully Shared with all the devices");
+            //Get the list of files shared
+            File folder = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/");
+            File[] listOfFiles = folder.listFiles();
+            int count = 0;
+            for(File f : listOfFiles){
+                resultTextView.append("\n "+ f.getName());
+            }
         }
     }
 
@@ -390,7 +399,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 int rIndex = (int) dataIn.readInt();
                 long size = dataIn.readLong();
 
-                String fileName = "ReceivedFile.chunk"+rIndex;
+                String fileName = "ReceivedFileChunk"+rIndex+".mp4";
 
                 File rFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+ fileName);
                 File dirs = new File(rFile.getParent());
@@ -414,23 +423,29 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 dataOut.writeUTF("GOFILEREADY");
                 dataOut.flush();
 
-                String gofileName = "ReceivedFile.chunk";
+                String gofileName = "ReceivedFile.mp4";
                 File goFile = new File(Environment.getExternalStorageDirectory()+ "/WifiNetworking/" + "/MobileData/" + gofileName);
 
                 size = goFile.length();
-                byte[] byteArray = new byte[(int) size];
+                //byte[] byteArray = new byte[(int) size];
+                byte[] byteArray = new byte[BUFFER_SIZE];
 
                 FileInputStream fis = new FileInputStream(goFile);
                 BufferedInputStream bis = new BufferedInputStream(fis);
-                DataInputStream dis = new DataInputStream(bis);
-                dis.readFully(byteArray,0,byteArray.length);
+//                DataInputStream dis = new DataInputStream(bis);
+//                dis.readFully(byteArray,0,byteArray.length);
 
                 Log.d(WiFiDirectActivity.TAG,"client Index : "+ index +"Sending GO File to the Client : "+clientIP +"  File Name :"+ gofileName );
 
                 dataOut.writeLong(size);
                 dataOut.flush();
 
-                dataOut.write(byteArray,0,byteArray.length);
+                //dataOut.write(byteArray,0,byteArray.length);
+                int len  = 0;
+                while ((len = bis.read(byteArray)) > 0){
+                    dataOut.write(byteArray,0,len);
+                    Log.d(WiFiDirectActivity.TAG,"Sending chunks");
+                }
                 dataOut.flush();
 
                 dataOut.writeUTF("ENDGOFILE");
@@ -454,15 +469,17 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                     for (int miss = 1;miss < index;miss++){
                         if(GOMAT[index][miss] == false){
                             //File missing at the client .Send the files
-                            fileName = "ReceivedFile.chunk"+miss;
+                            fileName = "ReceivedFileChunk"+miss+".mp4";
                             File cFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Received/"+ fileName);
                             long cSize = cFile.length();
-                            byte[] cByteArray = new byte[(int) cSize];
+//                            byte[] cByteArray = new byte[(int) cSize];
+
+                            byte[] cByteArray = new byte[BUFFER_SIZE];
 
                             FileInputStream cfis = new FileInputStream(cFile);
                             BufferedInputStream cbis = new BufferedInputStream(cfis);
-                            DataInputStream cdis = new DataInputStream(cbis);
-                            cdis.readFully(cByteArray,0,cByteArray.length);
+//                            DataInputStream cdis = new DataInputStream(cbis);
+//                            cdis.readFully(cByteArray,0,cByteArray.length);
 
                             Log.d(WiFiDirectActivity.TAG,"Sending missing data to the Client :" + fileName );
 
@@ -470,7 +487,12 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                             dataOut.writeLong(cSize);
                             dataOut.flush();
 
-                            dataOut.write(cByteArray,0,cByteArray.length);
+//                            dataOut.write(cByteArray,0,cByteArray.length);
+                            len = 0;
+                            while ((len = cbis.read(cByteArray)) > 0){
+                                dataOut.write(cByteArray,0,len);
+                                Log.d(WiFiDirectActivity.TAG,"Sending chunks");
+                            }
                             dataOut.flush();
 
                             GOMAT[index][miss] = true;
@@ -503,31 +525,6 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 clientlock[index].unlock();
             }
 
-            boolean allTransferred = false;
-            int tranCount = 0;
-
-            //Initiate connection to other clients and transfer the missing file ie current index file
-            String fileName = "ReceivedFile.chunk"+index;
-            File cFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Received/"+ fileName);
-            long cSize = cFile.length();
-            byte[] cByteArray = new byte[(int) cSize];
-
-            FileInputStream cfis = null;
-            try {
-                cfis = new FileInputStream(cFile);
-
-                BufferedInputStream cbis = new BufferedInputStream(cfis);
-                DataInputStream cdis = new DataInputStream(cbis);
-                cdis.readFully(cByteArray,0,cByteArray.length);
-
-
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-
             Log.d(WiFiDirectActivity.TAG,"Client Index " + index + " Transferring the files to other clients: while loop");
             for (int cMiss = 1; cMiss < index;cMiss++){
                 if(GOMAT[cMiss][index] == false){
@@ -542,6 +539,14 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                         DataInputStream dataIn = new DataInputStream(mSocket.getInputStream());
                         DataOutputStream dataOut = new DataOutputStream(mSocket.getOutputStream());
 
+                        //Initiate connection to other clients and transfer the missing file ie current index file
+                        String fileName = "ReceivedFileChunk"+index+".mp4";
+                        File cFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/"+ "/Received/"+ fileName);
+                        FileInputStream cfis = new FileInputStream(cFile);
+                        BufferedInputStream cbis = new BufferedInputStream(cfis);
+
+                        long cSize = cFile.length();
+
                         dataOut.writeUTF("RESTDATA");
                         dataOut.flush();
 
@@ -551,7 +556,13 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                         dataOut.writeLong(cSize);
                         dataOut.flush();
 
-                        dataOut.write(cByteArray,0,cByteArray.length);
+                        byte[] byteArray = new byte[BUFFER_SIZE];
+//                        dataOut.write(cByteArray,0,cByteArray.length);
+                        int len = 0;
+                        while ((len = cbis.read(byteArray)) > 0){
+                            dataOut.write(byteArray,0,len);
+                            Log.d(WiFiDirectActivity.TAG,"Sending Chunks");
+                        }
                         dataOut.flush();
 
                         GOMAT[cMiss][index] = true;
@@ -568,7 +579,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                         dataOut.close();
                         dataIn.close();
                         mSocket.close();
-                        tranCount++;
+
                         CLCONNECTED[cMiss] = false;
 
 
@@ -582,10 +593,10 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             }
 
             //File transfer of self files to the Received Folder to validate
-            String GOFileName = "ReceivedFile.chunk";
+            String GOFileName = "ReceivedFile.mp4";
             File clientFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/MobileData/"+ GOFileName);
 
-            String moveFileName = "ReceivedFile.MobileDataChunk";
+            String moveFileName = "ReceivedFileMobileData.mp4";
             File moveFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+moveFileName);
 
             try {
@@ -681,7 +692,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 Log.d(WiFiDirectActivity.TAG,"GO connection accepted, sending data");
 
                 Log.d(WiFiDirectActivity.TAG,"Waiting for the server to connect to client and send the file part to GO");
-                fileName = "ReceivedFile.chunk";
+                fileName = "ReceivedFile.mp4";
                 File sFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/MobileData/" + fileName);
 
                 receivedFiles[cIndex] = fileName; //storing the received file Name
@@ -689,11 +700,12 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 Log.d(WiFiDirectActivity.TAG,"Preparing Client File : " + sFile.getAbsolutePath());
 
                 long size = sFile.length();
-                byte[] byteArray = new byte[(int) size];
+                //byte[] byteArray = new byte[(int) size];
+                byte[] byteArray = new byte[BUFFER_SIZE];
 
                 BufferedInputStream bis = new BufferedInputStream(new FileInputStream(sFile));
-                DataInputStream dis = new DataInputStream(bis);
-                dis.readFully(byteArray,0,byteArray.length);
+//                DataInputStream dis = new DataInputStream(bis);
+//                dis.readFully(byteArray,0,byteArray.length);
 
                 DataInputStream serverData = new DataInputStream(groupOwner.getInputStream());
                 DataOutputStream clientData = new DataOutputStream(groupOwner.getOutputStream());
@@ -704,7 +716,12 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                     if(inputLine.equalsIgnoreCase("SENDDATA")){
                         clientData.writeInt(cIndex);
                         clientData.writeLong(size);
-                        clientData.write(byteArray,0,byteArray.length);
+                        //clientData.write(byteArray,0,byteArray.length);
+                        int len = 0;
+                        while((len = bis.read(byteArray)) > 0){
+                            clientData.write(byteArray,0,len);
+                            Log.d(WiFiDirectActivity.TAG,"Sending chunks");
+                        }
                         clientData.flush();
                         break;
                     }
@@ -720,7 +737,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 while ((inputLine = serverData.readUTF()) != null){
                     if(inputLine.equalsIgnoreCase("GOFILEREADY")){
                         size = serverData.readLong();
-                        fileName = "ReceivedFile.chunk0";
+                        fileName = "ReceivedFileChunk0.mp4";
 
                         File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+fileName);
                         File dirs = new File(receivedFile.getParent());
@@ -759,7 +776,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                             rIndex = serverData.readInt();
                             size = serverData.readLong();
 
-                            fileName = "ReceivedFile.chunk"+rIndex;
+                            fileName = "ReceivedFileChunk"+rIndex+".mp4";
                             File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+fileName);
                             File dirs = new File(receivedFile.getParent());
                             if(!dirs.exists()){
@@ -819,7 +836,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                             rIndex = dataIn.readInt();
                             long size = dataIn.readLong();
 
-                            fileName = "ReceivedFile.chunk" + rIndex;
+                            fileName = "ReceivedFileChunk" + rIndex+".mp4";
                             File receivedFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/" + fileName);
                             File dirs = new File(receivedFile.getParent());
                             if (!dirs.exists()) {
@@ -863,10 +880,10 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             }
 
             //File transfer of self files to the Received Folder to validate
-            String clientFileName = "ReceivedFile.chunk";
+            String clientFileName = "ReceivedFile.mp4";
             File clientFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/MobileData/"+clientFileName);
 
-            String moveFileName = "ReceivedFile.MobileDataChunk";
+            String moveFileName = "ReceivedFileMobileData.mp4";
             File moveFile = new File(Environment.getExternalStorageDirectory() + "/WifiNetworking/" + "/Received/"+moveFileName);
 
             try {
@@ -910,7 +927,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             }else if(progress.equalsIgnoreCase("ERRORRECEIVEMISSINGFILES")){
                 resultTextView.append("\n Error in receiving Missing Files from GO!!!");
             }else if(progress.equalsIgnoreCase("WAITINGFORADDITIONALCLIENTFILES")){
-                resultTextView.append("\n Waiting for New Clients to join the group and transfer Files");
+                resultTextView.append("\n Waiting for New Clients to join the group ");
             }else if(progress.equalsIgnoreCase("NEWCLIENTADDITIONALFILE")){
                 resultTextView.append("\n New Client connected. Transferring File");
             }else if(progress.equalsIgnoreCase("NEWCLIENTADDITIONALFILESUCCESS")){
